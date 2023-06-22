@@ -3,9 +3,14 @@ var express = require("express");
 var path = require("path");
 var cookieParser = require("cookie-parser");
 var logger = require("morgan");
+const { initializeS3, s3Storage } = require("./helpers/uploadFile");
+var indexRouter = require("./routes/index");
+var usersRouter = require("./routes/users");
+var apiRouter = require("./routes/api");
 var app = express();
-
 const mongoose = require("mongoose");
+const { log } = require("console");
+
 mongoose
   .connect(
     "mongodb+srv://admin:cpJ1dYxQMqiy49Qw@test.natv25m.mongodb.net/?retryWrites=true&w=majority"
@@ -14,10 +19,6 @@ mongoose
   .catch((error) =>
     console.log("Error connecting to database:", error.message)
   );
-
-var indexRouter = require("./routes/index");
-var usersRouter = require("./routes/users");
-var apiRouter = require("./routes/api");
 
 // view engine setup
 app.set("views", path.join(__dirname, "views"));
@@ -43,7 +44,7 @@ app.use(function (err, req, res, next) {
   // set locals, only providing error in development
   res.locals.message = err.message;
   res.locals.error = req.app.get("env") === "development" ? err : {};
-
+  console.log(err.message);
   // render the error page
   res.status(err.status || 500);
   res.render("error");

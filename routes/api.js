@@ -2,6 +2,9 @@ var express = require("express");
 const axios = require("axios");
 const cron = require("node-cron");
 const { Lecture, LectureBusan } = require("../models/lecture");
+const { uploadToAWS, sharpify } = require("../helpers/uploadFile");
+const multer = require("multer");
+
 var router = express.Router();
 
 const url =
@@ -10,9 +13,21 @@ const url =
 const url_busan =
   "https://apis.data.go.kr/6260000/BusanTblIeduScedService/getTblIeduScedInfo?serviceKey=qXPgVSHxQjlnhkX%2Bk8J5QMlTkEF4%2BHx2ACMZ%2BCP7oP93Gd8%2BWqQqBl2EGIjkN1kwMQknwKyMZxW6qHaU8nzQMg%3D%3D&pageNo=1&numOfRows=1000&resultType=json";
 
-router.get("/", function (req, res) {
-  res.send("/api");
-});
+const keywords = [
+  "어린이",
+  "유아",
+  "아동",
+  "청소년",
+  "학생",
+  "초등",
+  "중등",
+  "고등",
+  "대학생",
+  "청년",
+  "유치부",
+  "2-4세",
+  "5-7세",
+];
 
 const apiKey = "AIzaSyDhdx0e6xmovgxkM9mL4vhLVUSymlZ-O3o";
 
@@ -21,6 +36,38 @@ function getGeoCodeUrl(address) {
     address
   )}&key=${apiKey}`;
 }
+
+router.get("/", function (req, res) {
+  res.send("/api");
+});
+
+//
+router.post(
+  "/upload",
+  multer().fields([{ name: "file" }]),
+  async (req, res) => {
+    let result;
+    try {
+      const files = req.files.file;
+      for (const key in files) {
+        const originalFile = files[key];
+
+        const newFile = await sharpify(originalFile);
+        result = await uploadToAWS({
+          Body: newFile,
+          ACL: "public-read",
+          Bucket: "edu-map",
+          ContentType: originalFile.mimetype,
+          Key: `images/${originalFile.originalname}`,
+        });
+      }
+
+      res.status(200).json({ success: true, url: result.Location });
+    } catch (err) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  }
+);
 
 /* GET users listing. */
 router.get("/lecture", async function (req, res) {
@@ -40,7 +87,7 @@ router.get("/lecture", async function (req, res) {
 });
 
 function getStreetViewImage(lat, lng) {
-  return `https://maps.googleapis.com/maps/api/streetview?size=200x200&location=${lat},${lng}&key=AIzaSyDhdx0e6xmovgxkM9mL4vhLVUSymlZ-O3o`;
+  return `https://maps.googleapis.com/maps/api/streetview?size=300x300&location=${lat},${lng}&key=AIzaSyDhdx0e6xmovgxkM9mL4vhLVUSymlZ-O3o`;
 }
 
 router.get("/fetchBusanLectures", async function (req, res) {
@@ -54,10 +101,8 @@ router.get("/fetchBusanLectures", async function (req, res) {
 
     const lectures = items.map((item) => {
       item.streetViewUrl = getStreetViewImage(item.lat, item.lng);
-      console.log(item);
       return new LectureBusan(item);
     });
-
     await LectureBusan.insertMany(lectures);
     res.send(`${lectures.length} items saved successfully.`);
   } catch (error) {
@@ -89,10 +134,14 @@ router.get("/fetchAllLectures", async function (req, res) {
 
       // Filter items based on edcStartDay
       const filteredItems = items.filter((item) => {
+        const title = item.edcTrgetType;
+        // filter minor
+        if (keywords.some((keyword) => title.includes(keyword))) {
+          return false;
+        }
+        // get coords
         const edcStartDay = new Date(item.edcStartDay);
         const today = new Date();
-
-        // Calculate the date range
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(today.getDate() - 30);
         const thirtyDaysFromNow = new Date();
@@ -106,12 +155,14 @@ router.get("/fetchAllLectures", async function (req, res) {
           .then((res) => {
             const results = res.data.results;
             const location = results[0].geometry.location;
-            item.lat = location.lat;
-            item.lng = location.lng;
+            item.lat = location.lat.toString();
+            item.lng = location.lng.toString();
+            item.streetViewUrl = getStreetViewImage(item.lat, item.lng);
             return item;
           })
           .catch((e) => console.log(e));
       });
+
       const resolvedItems = await Promise.all(updatedItems);
       console.log(resolvedItems);
       totalItems += resolvedItems.length;
@@ -140,6 +191,13 @@ router.get("/getBusanLecture", async function (req, res) {
   } catch (error) {
     console.log(error);
   }
+});
+
+router.get("/filter", async function (req, res) {
+  try {
+    const result = await Lecture.find({}, { lctreNm: 1 });
+    res.json(result);
+  } catch (error) {}
 });
 
 // Schedule the API fetch once a day

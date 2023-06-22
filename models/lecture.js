@@ -27,8 +27,8 @@ const lectureSchema = new mongoose.Schema({
   lrnAcnutAckestYn: String,
   referenceDate: Date,
   insttCode: String,
-  lat: Number,
-  lng: Number,
+  lat: String,
+  lng: String,
   streetViewUrl: String,
 });
 
@@ -49,8 +49,8 @@ const lectureBusanSchema = new mongoose.Schema({
   dataDay: Date,
   roadAddr: String,
   addr: String,
-  lat: String,
-  lng: String,
+  lat: Number,
+  lng: Number,
   streetViewUrl: String,
 });
 

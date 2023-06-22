@@ -1,0 +1,8 @@
+
+get http://localhost:3000/api/fetchBusanLectures
+
+###
+
+get http://localhost:3000/api/filter
+
+###
