@@ -4,6 +4,7 @@ const cron = require("node-cron");
 const { Lecture, LectureBusan } = require("../models/lecture");
 const { uploadToAWS, sharpify } = require("../helpers/uploadFile");
 const multer = require("multer");
+const { log } = require("debug/src/browser");
 
 var router = express.Router();
 
@@ -41,29 +42,35 @@ router.get("/", function (req, res) {
   res.send("/api");
 });
 
-//
 router.post(
   "/upload",
   multer().fields([{ name: "file" }]),
   async (req, res) => {
     let result;
+    const { type } = req.query;
     try {
       const files = req.files.file;
-      for (const key in files) {
-        const originalFile = files[key];
-
-        const newFile = await sharpify(originalFile);
-        result = await uploadToAWS({
-          Body: newFile,
-          ACL: "public-read",
-          Bucket: "edu-map",
-          ContentType: originalFile.mimetype,
-          Key: `images/${originalFile.originalname}`,
-        });
+      const originalFile = files[0];
+      let fileToUpload;
+      if (type === "image") {
+        fileToUpload = await sharpify(originalFile);
+      } else {
+        fileToUpload = originalFile.buffer; // Use the file buffer directly
       }
-
-      res.status(200).json({ success: true, url: result.Location });
+      result = await uploadToAWS({
+        Body: fileToUpload,
+        ACL: "public-read",
+        Bucket: "edu-map",
+        ContentType: originalFile.mimetype,
+        Key: `${type}/${originalFile.originalname}`,
+      });
+      res.status(200).json({
+        success: true,
+        url: result.Location,
+        fileName: result.key,
+      });
     } catch (err) {
+      console.log(err.message);
       res.status(400).json({ success: false, error: err.message });
     }
   }

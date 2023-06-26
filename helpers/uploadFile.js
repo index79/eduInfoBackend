@@ -1,9 +1,6 @@
 const AWS = require("aws-sdk");
 const sharp = require("sharp");
-
-const AWS_ACCESS_KEY_ID = "AKIAZZGXKU7TJECSOSFH";
-const AWS_SECRET_ACCESS_KEY = "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";
-const AWS_REGION = "ap-northeast-2";
+require("dotenv").config();
 
 const sharpify = async (originalFile) => {
   try {
@@ -28,12 +25,12 @@ const sharpify = async (originalFile) => {
 const uploadToAWS = (props) => {
   return new Promise((resolve, reject) => {
     const s3 = new AWS.S3({
-      accessKeyId: AWS_ACCESS_KEY_ID,
-      secretAccessKey: AWS_SECRET_ACCESS_KEY,
-      region: AWS_REGION,
+      accessKeyId: process.env.S3_ACCESS_KEY_ID,
+      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+      region: process.env.S3_REGION,
     });
     s3.upload(props, (err, data) => {
-      if (err) reject(err);
+      if (err) console.log(err.message);
       resolve(data);
     });
   });
